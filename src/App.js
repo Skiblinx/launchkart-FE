@@ -812,6 +812,8 @@ const Dashboard = () => {
   const { user } = useUser();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showEssentialsBanner, setShowEssentialsBanner] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardData();
@@ -832,6 +834,32 @@ const Dashboard = () => {
 
   return (
     <div className="max-w-6xl mx-auto bg-gradient-to-br from-white via-pink-50 to-purple-50 rounded-xl shadow-lg p-4 sm:p-8">
+      {showEssentialsBanner && (
+        <div className="flex items-center justify-between bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600 text-white rounded-xl px-6 py-4 mb-6 shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🎁</span>
+            <span className="font-semibold">Get your <span className="underline">Free Business Essentials</span> now!</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setShowEssentialsBanner(false);
+                navigate('/services?tab=business-essentials');
+              }}
+              className="bg-white text-pink-500 font-bold px-4 py-2 rounded-full shadow hover:bg-pink-50 transition-all duration-300"
+            >
+              Claim Now
+            </button>
+            <button
+              onClick={() => setShowEssentialsBanner(false)}
+              className="text-white hover:text-gray-200 text-xl px-2"
+              aria-label="Close banner"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Welcome back, {user.fullName || user.name}!

@@ -7,7 +7,7 @@ const navItems = [
   { to: "/services", label: "Services", icon: "🛠️" },
   { to: "/mentors", label: "Mentors", icon: "🎓" },
   { to: "/investment", label: "Investment", icon: "💸", role: "founder" },
-  { to: "/admin", label: "Admin", icon: "🛡️", role: "admin" },
+  { to: "/admin/dashboard", label: "Admin", icon: "🛡️", role: "admin" },
 ];
 
 const Sidebar = () => {

@@ -12,8 +12,8 @@ import AdminDashboard from './components/AdminDashboard';
 import EmailVerification from './components/EmailVerification';
 
 // const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-// const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://launchkart.onrender.com';
+// const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://launchkart.onrender.com';
 const API = `${BACKEND_URL}/api`;
 
 // Utility for authenticated requests (always include token from sessionStorage)
@@ -21,10 +21,10 @@ export const apiRequest = (method, url, data, config = {}) => {
   // Check for both user token and admin token
   const userToken = sessionStorage.getItem('token');
   const adminToken = sessionStorage.getItem('admin_token');
-  
+
   // Use admin token for admin routes, otherwise use user token
   const token = url.includes('/admin/') ? adminToken : userToken;
-  
+
   const headers = {
     ...(config.headers || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

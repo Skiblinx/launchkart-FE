@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 import KYCFlow from './components/KYCFlow';
@@ -8,15 +8,23 @@ import { UserProvider, useUser } from './context/UserContext';
 import ServicesMarketplace from './components/ServicesMarketplace';
 import MentorshipSystem from './components/MentorshipSystem';
 import InvestmentSyndicate from './components/InvestmentSyndicate';
+import AdminDashboard from './components/AdminDashboard';
+import EmailVerification from './components/EmailVerification';
 
 // const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-// const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://launchkart.onrender.com';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+// const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'https://launchkart.onrender.com';
 const API = `${BACKEND_URL}/api`;
 
 // Utility for authenticated requests (always include token from sessionStorage)
 export const apiRequest = (method, url, data, config = {}) => {
-  const token = sessionStorage.getItem('token');
+  // Check for both user token and admin token
+  const userToken = sessionStorage.getItem('token');
+  const adminToken = sessionStorage.getItem('admin_token');
+  
+  // Use admin token for admin routes, otherwise use user token
+  const token = url.includes('/admin/') ? adminToken : userToken;
+  
   const headers = {
     ...(config.headers || {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -63,7 +71,7 @@ const Header = () => {
                   <Link to="/investment" className="text-gray-600 hover:text-blue-600">Investment</Link>
                 )}
                 {user.role === 'admin' && (
-                  <Link to="/admin" className="text-gray-600 hover:text-blue-600">Admin</Link>
+                  <Link to="/admin/dashboard" className="text-gray-600 hover:text-blue-600">Admin</Link>
                 )}
               </nav>
             )}
@@ -169,11 +177,24 @@ const SignupPage = () => {
     setLoading(true);
     try {
       const response = await apiRequest('post', '/auth/signup', formData);
-      setUser(response.data.user);
-      sessionStorage.setItem('user', JSON.stringify(response.data.user));
-      sessionStorage.setItem('token', response.data.token); // store as plain string
-      setToast({ message: 'Account created successfully!', type: 'success' });
-      setTimeout(() => navigate('/kyc'), 1500);
+
+      // Store email for potential resend verification
+      window.lastVerificationEmail = formData.email;
+
+      if (response.data.email_verification_required) {
+        setToast({
+          message: 'Account created! Please check your email to verify your account before signing in.',
+          type: 'success'
+        });
+        setTimeout(() => navigate('/login?message=verification-sent'), 2000);
+      } else {
+        // Fallback for existing flow
+        setUser(response.data.user);
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
+        sessionStorage.setItem('token', response.data.token);
+        setToast({ message: 'Account created successfully!', type: 'success' });
+        setTimeout(() => navigate('/kyc'), 1500);
+      }
     } catch (error) {
       setToast({
         message: error.response?.data?.detail || 'Signup failed',
@@ -435,8 +456,29 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [canResendVerification, setCanResendVerification] = useState(false);
   const { setUser } = useUser();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for URL messages
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const message = urlParams.get('message');
+    const verified = urlParams.get('verified');
+
+    if (message === 'verification-sent') {
+      setToast({
+        message: 'Verification email sent! Please check your inbox and verify your email before signing in.',
+        type: 'success'
+      });
+    } else if (verified === 'true') {
+      setToast({
+        message: 'Email verified successfully! You can now sign in.',
+        type: 'success'
+      });
+    }
+  }, [location]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -463,10 +505,21 @@ const LoginPage = () => {
       setToast({ message: 'Login successful!', type: 'success' });
       setTimeout(() => navigate('/dashboard'), 1500);
     } catch (error) {
-      setToast({
-        message: error.response?.data?.detail || 'Login failed',
-        type: 'error'
-      });
+      const errorMessage = error.response?.data?.detail || 'Login failed';
+
+      // Check if it's an email verification error
+      if (error.response?.status === 403 && errorMessage.includes('Email not verified')) {
+        setCanResendVerification(true);
+        setToast({
+          message: 'Please verify your email before signing in. Check your inbox for the verification link.',
+          type: 'error'
+        });
+      } else {
+        setToast({
+          message: errorMessage,
+          type: 'error'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -485,9 +538,31 @@ const LoginPage = () => {
       return;
     }
 
-    // Placeholder for forgot password functionality
-    setToast({ message: 'Password reset link sent to your email (demo)', type: 'success' });
-    setShowForgotPassword(false);
+    try {
+      await apiRequest('post', '/email/request-password-reset', { email: formData.email });
+      setToast({ message: 'Password reset link sent to your email', type: 'success' });
+      setShowForgotPassword(false);
+    } catch (error) {
+      setToast({ message: 'Failed to send password reset email', type: 'error' });
+    }
+  };
+
+  const resendVerificationEmail = async () => {
+    if (!formData.email) {
+      setToast({ message: 'Please enter your email first', type: 'error' });
+      return;
+    }
+
+    try {
+      await apiRequest('post', '/email/resend-verification', { email: formData.email });
+      setToast({ message: 'Verification email sent! Please check your inbox.', type: 'success' });
+      setCanResendVerification(false);
+    } catch (error) {
+      setToast({
+        message: error.response?.data?.detail || 'Failed to resend verification email',
+        type: 'error'
+      });
+    }
   };
 
   return (
@@ -553,6 +628,21 @@ const LoginPage = () => {
                 Forgot password?
               </button>
             </div>
+
+            {canResendVerification && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 mb-2">
+                  Email not verified?
+                </p>
+                <button
+                  type="button"
+                  onClick={resendVerificationEmail}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Resend verification email
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -674,10 +764,10 @@ const LandingPage = () => {
           {/* Hero Section */}
           <div className="text-center mb-20">
             <div className="flex justify-center items-center space-x-3 mb-6">
-          <div className="w-16 h-16 bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-            <span className="text-white font-extrabold text-2xl drop-shadow">LK</span>
-          </div>
-          <h1 className="text-5xl font-extrabold text-pink-500 drop-shadow">LaunchKart</h1>
+              <div className="w-16 h-16 bg-gradient-to-r from-pink-500 via-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-extrabold text-2xl drop-shadow">LK</span>
+              </div>
+              <h1 className="text-5xl font-extrabold text-pink-500 drop-shadow">LaunchKart</h1>
             </div>
             <p className="text-xl text-purple-500 mb-8 max-w-3xl mx-auto">
               Empowering early-stage entrepreneurs in India & UAE with business essentials,
@@ -743,19 +833,19 @@ const LandingPage = () => {
             <h2 className="text-3xl font-bold text-center mb-12">Trusted by Entrepreneurs</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               <div className="text-center">
-            <div className="text-3xl font-bold text-pink-500 mb-2">500+</div>
+                <div className="text-3xl font-bold text-pink-500 mb-2">500+</div>
                 <div className="text-gray-600">Startups Launched</div>
               </div>
               <div className="text-center">
-            <div className="text-3xl font-bold text-purple-600 mb-2">₹50M+</div>
+                <div className="text-3xl font-bold text-purple-600 mb-2">₹50M+</div>
                 <div className="text-gray-600">Funding Raised</div>
               </div>
               <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600 mb-2">100+</div>
+                <div className="text-3xl font-bold text-blue-600 mb-2">100+</div>
                 <div className="text-gray-600">Expert Mentors</div>
               </div>
               <div className="text-center">
-            <div className="text-3xl font-bold text-pink-500 mb-2">2</div>
+                <div className="text-3xl font-bold text-pink-500 mb-2">2</div>
                 <div className="text-gray-600">Countries</div>
               </div>
             </div>
@@ -1003,6 +1093,7 @@ const App = () => {
           <Route path="/" element={<><Header /><LandingPage /></>} />
           <Route path="/login" element={<><Header /><LoginPage /></>} />
           <Route path="/signup" element={<><Header /><SignupPage /></>} />
+          <Route path="/verify-email" element={<EmailVerification />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/dashboard" element={
             <ProtectedRoute>
@@ -1029,14 +1120,7 @@ const App = () => {
               <InvestmentSyndicate />
             </ProtectedRoute>
           } />
-          <Route path="/admin" element={
-            <ProtectedRoute>
-              <div className="text-center py-20">
-                <h1 className="text-3xl font-bold mb-4">Admin Panel</h1>
-                <p className="text-gray-600">Admin dashboard coming soon...</p>
-              </div>
-            </ProtectedRoute>
-          } />
+          <Route path="/admin/*" element={<AdminDashboard />} />
         </Routes>
       </Router>
     </UserProvider>

@@ -224,7 +224,7 @@ const AdminLogin = () => {
 };
 
 // Admin Sidebar Component
-const AdminSidebar = () => {
+const AdminSidebar = ({ isOpen, setIsOpen }) => {
   const { adminUser, logout, hasPermission } = useAdmin();
   const location = useLocation();
 
@@ -240,67 +240,109 @@ const AdminSidebar = () => {
     { path: '/admin/admins', label: 'Admin Management', icon: '👑', permission: 'admin_management' }
   ];
 
+  const handleMenuClick = () => {
+    if (window.innerWidth < 1024) {
+      setIsOpen(false);
+    }
+  };
+
   return (
-    <aside className="w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-white h-screen fixed left-0 top-0 z-40 shadow-2xl">
-      <div className="p-6 border-b border-slate-700">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold">🛡️</span>
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">Admin Portal</h2>
-            <p className="text-xs text-slate-400 capitalize">{adminUser?.role}</p>
-          </div>
-        </div>
-      </div>
-
-      <nav className="p-4 space-y-2">
-        {menuItems.map((item) => {
-          if (item.permission && !hasPermission(item.permission)) return null;
-
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                location.pathname === item.path
-                  ? 'bg-purple-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-              }`}
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={`
+        w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-white h-screen fixed left-0 top-0 z-40 shadow-2xl
+        transform transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="p-6 border-b border-slate-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">🛡️</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Admin Portal</h2>
+                <p className="text-xs text-slate-400 capitalize">{adminUser?.role}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="lg:hidden text-slate-400 hover:text-white"
             >
-              <span className="text-lg">{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
-        <div className="mb-4">
-          <p className="text-sm text-slate-400">Logged in as:</p>
-          <p className="text-white font-medium truncate">{adminUser?.fullName}</p>
-          <p className="text-xs text-slate-400 truncate">{adminUser?.email}</p>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
-        <button
-          onClick={logout}
-          className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-        >
-          Logout
-        </button>
-      </div>
-    </aside>
+
+        <nav className="p-4 space-y-2 overflow-y-auto" style={{ height: 'calc(100vh - 200px)' }}>
+          {menuItems.map((item) => {
+            if (item.permission && !hasPermission(item.permission)) return null;
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={handleMenuClick}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                  location.pathname === item.path
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                }`}
+              >
+                <span className="text-lg">{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
+          <div className="mb-4">
+            <p className="text-sm text-slate-400">Logged in as:</p>
+            <p className="text-white font-medium truncate">{adminUser?.fullName}</p>
+            <p className="text-xs text-slate-400 truncate">{adminUser?.email}</p>
+          </div>
+          <button
+            onClick={logout}
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      </aside>
+    </>
   );
 };
 
 // Admin Header Component
-const AdminHeader = ({ title }) => {
+const AdminHeader = ({ title, onMenuClick }) => {
   const { adminUser } = useAdmin();
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 h-16 flex items-center justify-between px-6">
-      <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+    <header className="bg-white shadow-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-6">
       <div className="flex items-center space-x-4">
-        <div className="text-right">
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <h1 className="text-xl lg:text-2xl font-bold text-gray-900 truncate">{title}</h1>
+      </div>
+      <div className="flex items-center space-x-2 lg:space-x-4">
+        <div className="text-right hidden sm:block">
           <p className="text-sm font-medium text-gray-900">{adminUser?.fullName}</p>
           <p className="text-xs text-gray-500 capitalize">{adminUser?.role}</p>
         </div>
@@ -317,6 +359,7 @@ const AdminHeader = ({ title }) => {
 // Protected Admin Route Component
 const ProtectedAdminRoute = ({ children, permission = null }) => {
   const { isAuthenticated, loading, hasPermission } = useAdmin();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (loading) {
     return (
@@ -341,11 +384,16 @@ const ProtectedAdminRoute = ({ children, permission = null }) => {
     );
   }
 
+  // Clone children and inject menu handler
+  const childrenWithProps = React.cloneElement(children, {
+    onMenuClick: () => setSidebarOpen(true)
+  });
+
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-      <div className="flex-1 ml-64">
-        {children}
+      <AdminSidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+      <div className="flex-1 lg:ml-64 min-w-0">
+        {childrenWithProps}
       </div>
     </div>
   );
@@ -409,9 +457,9 @@ const AdminDashboard = () => {
 };
 
 
-// Placeholder components for other modules
-const KYCManagement = () => <div><AdminHeader title="KYC Management" /><div className="p-6">KYC Management coming soon...</div></div>;
-const MentorshipManagement = () => <div><AdminHeader title="Mentorship Management" /><div className="p-6">Mentorship Management coming soon...</div></div>;
-const InvestmentManagement = () => <div><AdminHeader title="Investment Management" /><div className="p-6">Investment Management coming soon...</div></div>;
+// Import the management components
+import KYCManagement from './KYCManagement';
+import MentorshipManagement from './MentorshipManagement';
+import InvestmentManagement from './InvestmentManagement';
 
 export default AdminDashboard;
